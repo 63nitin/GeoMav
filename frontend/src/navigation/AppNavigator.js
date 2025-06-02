@@ -9,6 +9,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AttendanceScreen from '../screens/AttendanceScreen';
 import AttendanceHistoryScreen from '../screens/AttendanceHistoryScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import EmployeeAttendanceScreen from '../screens/EmployeeAttendanceScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -24,6 +25,11 @@ const AppNavigator = () => {
                 <Stack.Screen name="Attendance" component={AttendanceScreen} />
                 <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
                 <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+                <Stack.Screen 
+                    name="EmployeeAttendance" 
+                    component={EmployeeAttendanceScreen}
+                    options={{ headerShown: true }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );

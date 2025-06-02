@@ -114,7 +114,10 @@ const AdminDashboardScreen = ({ navigation }) => {
                 styles.employeeCard,
                 selectedEmployee === item._id && styles.selectedCard
             ]}
-            onPress={() => fetchEmployeeAttendance(item._id)}
+            onPress={() => navigation.navigate('EmployeeAttendance', {
+                employeeId: item._id,
+                employeeName: item.name
+            })}
         >
             <View style={styles.employeeInfo}>
                 <Text style={styles.employeeName}>{item.name}</Text>

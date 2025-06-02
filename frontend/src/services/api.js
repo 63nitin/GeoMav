@@ -16,6 +16,9 @@ const api = axios.create({
 api.interceptors.request.use(
     async (config) => {
         console.log('Making request to:', config.url);
+        console.log('Request method:', config.method);
+        console.log('Request headers:', config.headers);
+        console.log('Request data:', config.data);
         
         // Get token from AsyncStorage
         const token = await AsyncStorage.getItem('token');
@@ -23,6 +26,7 @@ api.interceptors.request.use(
         // If token exists, add it to the Authorization header
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+            console.log('Added token to request');
         }
         
         return config;
@@ -36,21 +40,24 @@ api.interceptors.request.use(
 // Add response interceptor
 api.interceptors.response.use(
     (response) => {
-        console.log('Response received:', response.config.url);
+        console.log('Response received from:', response.config.url);
+        console.log('Response status:', response.status);
+        console.log('Response data:', response.data);
         return response;
     },
     async (error) => {
-        console.error('Response error:', {
+        console.error('Response error details:', {
             url: error.config?.url,
+            method: error.config?.method,
+            status: error.response?.status,
+            data: error.response?.data,
             message: error.message,
-            response: error.response?.data,
         });
 
         // If the error is due to an invalid or expired token
         if (error.response?.status === 401) {
-            // Clear the token and user data
+            console.log('Authentication error detected, clearing stored data');
             await AsyncStorage.multiRemove(['token', 'user', 'userRole']);
-            // You might want to redirect to login here
         }
 
         return Promise.reject(error);
@@ -144,19 +151,34 @@ export const getLocationName = async (latitude, longitude) => {
     try {
         console.log('Getting location name for:', { latitude, longitude });
         const response = await axios.get(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}&language=en&result_type=street_address|route|neighborhood|sublocality|locality`
         );
         
         if (response.data.results && response.data.results.length > 0) {
-            // Get the most relevant result (first one)
-            const location = response.data.results[0];
-            // Return a simplified address (usually the street name or nearby landmark)
-            return location.formatted_address;
+            // Try to get the most relevant address components
+            const result = response.data.results[0];
+            const addressComponents = result.address_components;
+            
+            // Try to construct a meaningful location name
+            const street = addressComponents.find(c => c.types.includes('route'))?.long_name;
+            const sublocality = addressComponents.find(c => c.types.includes('sublocality'))?.long_name;
+            const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name;
+            
+            if (street && (sublocality || locality)) {
+                return `${street}, ${sublocality || locality}`;
+            }
+            
+            // Fallback to formatted address if we couldn't construct a specific one
+            return result.formatted_address;
         }
         
+        console.warn('No results found for coordinates:', { latitude, longitude });
         return 'Location not found';
     } catch (error) {
         console.error('Error getting location name:', error);
+        if (error.response) {
+            console.error('Geocoding API response:', error.response.data);
+        }
         return 'Location not found';
     }
 };
@@ -225,11 +247,32 @@ export const getOrganizationEmployees = async () => {
     }
 };
 
-// Get employee attendance
+// Get employee attendance with location names
 export const getEmployeeAttendance = async (employeeId) => {
     try {
+        console.log('Fetching attendance for employee:', employeeId);
         const response = await api.get(`/admin/employee-attendance/${employeeId}`);
-        return response.data;
+        
+        if (!response.data.attendance || !Array.isArray(response.data.attendance)) {
+            console.warn('Invalid attendance response:', response.data);
+            return { attendance: [] };
+        }
+
+        // Add location names to each attendance record
+        const attendanceWithLocations = await Promise.all(
+            response.data.attendance.map(async (record) => {
+                const locationName = await getLocationName(
+                    record.location.coordinates[1],
+                    record.location.coordinates[0]
+                );
+                return {
+                    ...record,
+                    locationName
+                };
+            })
+        );
+        
+        return { attendance: attendanceWithLocations };
     } catch (error) {
         console.error('Get employee attendance error:', error);
         throw new Error(error.response?.data?.error || 'Failed to fetch employee attendance');

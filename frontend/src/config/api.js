@@ -1,5 +1,5 @@
 // API Configuration
-export const API_URL = 'http://192.168.1.5:3000/api'; // Your computer's IP address
+export const API_URL = 'http://192.168.1.17:3000/api'; // Your computer's IP address
 
 // API Endpoints
 export const ENDPOINTS = {
